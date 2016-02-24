@@ -8,6 +8,7 @@ import UserNotification from 'util/UserNotification';
 export const MapsActions = Reflux.createActions({
   'get': {asyncResult: true},
   'getMapData': {asyncResult: true},
+  'getGeoJson': {asyncResult: true},
 });
 
 export const MapsStore = Reflux.createStore({
@@ -43,6 +44,19 @@ export const MapsStore = Reflux.createStore({
     );
 
     MapsActions.getMapData.promise(promise);
+  },
+
+  getGeoJson() {
+    const promise = fetch('GET', URLUtils.qualifyUrl('/plugins/org.graylog.plugins.map/geojson'));
+
+    promise.then(
+      response => {
+        this.trigger({geoJson: response});
+      },
+      this._errorHandler('Loading GEOJSON data failed:', 'Could not load GEOJSON data')
+    );
+
+    MapsActions.getGeoJson.promise(promise);
   },
 
   get(field) {

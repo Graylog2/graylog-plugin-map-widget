@@ -1,6 +1,7 @@
 package org.graylog.plugins.map.rest;
 
 import com.codahale.metrics.annotation.Timed;
+import com.google.common.io.Resources;
 import com.wordnik.swagger.annotations.Api;
 import com.wordnik.swagger.annotations.ApiOperation;
 import com.wordnik.swagger.annotations.ApiParam;
@@ -22,14 +23,16 @@ import org.slf4j.LoggerFactory;
 import javax.inject.Inject;
 import javax.ws.rs.BadRequestException;
 import javax.ws.rs.Consumes;
+import javax.ws.rs.GET;
 import javax.ws.rs.POST;
 import javax.ws.rs.Path;
 import javax.ws.rs.Produces;
 import javax.ws.rs.core.MediaType;
+import java.io.IOException;
 
+@Path("/")
 @RequiresAuthentication
 @Api(value = "MapWidget", description = "Get map data")
-@Path("/mapdata")
 public class MapDataResource extends SearchResource implements PluginRestResource {
     private static final Logger LOG = LoggerFactory.getLogger(MapDataResource.class);
 
@@ -42,6 +45,7 @@ public class MapDataResource extends SearchResource implements PluginRestResourc
     }
 
     @POST
+    @Path("/mapdata")
     @Timed
     @ApiOperation(value = "Get map data")
     @Consumes(MediaType.APPLICATION_JSON)
@@ -67,5 +71,14 @@ public class MapDataResource extends SearchResource implements PluginRestResourc
             LOG.error("Map data query failed: {}", e.getMessage());
             throw new BadRequestException(e.getMessage());
         }
+    }
+
+    @GET
+    @Path("/geojson")
+    @Timed
+    @ApiOperation(value = "Get GEOJSON map")
+    @Produces(MediaType.APPLICATION_JSON)
+    public byte[] geoJson() throws IOException {
+        return Resources.asByteSource(Resources.getResource("geojson-map.json")).read();
     }
 }

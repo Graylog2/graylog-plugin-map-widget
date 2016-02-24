@@ -1,8 +1,12 @@
 import React, {PropTypes} from 'react';
+import Reflux from 'reflux';
 import { Map, TileLayer, CircleMarker, Popup } from 'react-leaflet';
+import CustomGeoJson from 'components/CustomGeoJson';
 import { Spinner } from 'components/common';
 
 import 'leaflet/dist/leaflet.css';
+
+import { MapsActions, MapsStore } from 'stores/MapsStore';
 
 const MapVisualization = React.createClass({
   propTypes: {
@@ -14,6 +18,7 @@ const MapVisualization = React.createClass({
     url: PropTypes.string,
     attribution: PropTypes.string,
   },
+  mixins: [Reflux.connect(MapsStore)],
   getDefaultProps() {
     return {
       data: {},
@@ -26,6 +31,7 @@ const MapVisualization = React.createClass({
     };
   },
   componentDidMount() {
+    MapsActions.getGeoJson();
     this._onComponentMount();
   },
   _onComponentMount() {
@@ -62,6 +68,15 @@ const MapVisualization = React.createClass({
 
     return bucket + increment;
   },
+  _handleGeoLayer(layer) {
+    layer.setStyle({
+      fillColor: '#003171',
+      fillOpacity: 1,
+      color: '#555',
+      weight: 1,
+      opacity: 0.5,
+    });
+  },
   render() {
     if (!this.state.isComponentMounted) {
       return <Spinner/>;
@@ -78,11 +93,32 @@ const MapVisualization = React.createClass({
     const leafletUrl = this.props.url || this.DEFAULT_URL;
     const leafletAttribution = this.props.attribution || this.DEFAULT_ATTRIBUTION;
 
+    let geoJson;
+    if (this.state.geoJson) {
+      geoJson = (<CustomGeoJson ref="geojson" handleLayer={this._handleGeoLayer} data={this.state.geoJson} />);
+    } else {
+      geoJson = null;
+    }
+
+    /*
+    if (this.refs.geojson) {
+      this.refs.geojson.getLeafletElement().eachLayer((layer) => {
+        layer.setStyle({
+          fillColor: '#003171',
+          fillOpacity: 1,
+          color: '#555',
+          weight: 1,
+          opacity: 0.5,
+        });
+      });
+    }
+    */
+
+    let tileLayer = (<TileLayer url={leafletUrl} maxZoom={19} attribution={leafletAttribution}/>);
+
     return (
       <Map center={this.position} zoom={this.state.zoomLevel} onZoomend={this._onZoomChange} style={{height: this.props.height, width: this.props.width}} scrollWheelZoom={false}>
-        <TileLayer url={leafletUrl}
-                   maxZoom={19}
-                   attribution={leafletAttribution}/>
+        {geoJson}
         {markers}
       </Map>
     );
