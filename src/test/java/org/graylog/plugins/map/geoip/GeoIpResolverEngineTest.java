@@ -85,6 +85,22 @@ public class GeoIpResolverEngineTest {
     }
 
     @Test
+    public void doNotExtractGraylogData() throws Exception {
+        final GeoIpResolverEngine resolver = new GeoIpResolverEngine(config.toBuilder().enabled(false).build(), metricRegistry);
+
+        final Map<String, Object> messageFields = Maps.newHashMap();
+        messageFields.put("_id", (new UUID()).toString());
+        messageFields.put("gl2_source_node", "8.8.8.8");
+
+        final Message message = new Message(messageFields);
+        final boolean filtered = resolver.filter(message);
+
+        assertFalse(filtered, "Message should not be filtered out");
+        assertNull(message.getField("gl2_source_node_geolocation"), "Should not resolve and expose Graylog meta data");
+
+    }
+
+    @Test
     public void extractGeoLocationInformation() throws Exception {
         final GeoIpResolverEngine resolver = new GeoIpResolverEngine(config, metricRegistry);
 
