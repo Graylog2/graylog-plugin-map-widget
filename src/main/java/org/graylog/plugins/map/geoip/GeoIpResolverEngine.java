@@ -44,6 +44,7 @@ public class GeoIpResolverEngine {
     private final Timer resolveTime;
     private DatabaseReader databaseReader;
     private boolean enabled;
+    private final String GRAYLOG_PREFIX = "gl2_";
 
 
     public GeoIpResolverEngine(GeoIpResolverConfig config, MetricRegistry metricRegistry) {
@@ -70,12 +71,14 @@ public class GeoIpResolverEngine {
         }
 
         for (Map.Entry<String, Object> field : message.getFields().entrySet()) {
-            String key = field.getKey() + "_geolocation";
-            final List coordinates = extractGeoLocationInformation(field.getValue());
-            if (coordinates.size() == 2) {
-                // We will store the coordinates as a "lat,long" string
-                final String stringGeoPoint = coordinates.get(1) + "," + coordinates.get(0);
-                message.addField(key, stringGeoPoint);
+            if (!field.getKey().startsWith(GRAYLOG_PREFIX)) {
+                String key = field.getKey() + "_geolocation";
+                final List coordinates = extractGeoLocationInformation(field.getValue());
+                if (coordinates.size() == 2) {
+                    // We will store the coordinates as a "lat,long" string
+                    final String stringGeoPoint = coordinates.get(1) + "," + coordinates.get(0);
+                    message.addField(key, stringGeoPoint);
+                }
             }
         }
 
