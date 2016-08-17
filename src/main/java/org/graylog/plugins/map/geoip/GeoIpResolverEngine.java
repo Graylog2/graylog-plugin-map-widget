@@ -75,7 +75,6 @@ public class GeoIpResolverEngine {
 			}
 			addCoordinatesField(message, field.getKey(), cityResponse);
 			addCountryIsoCodeField(message, field.getKey(), cityResponse);
-			addCityNameField(message, field.getKey(), cityResponse);
 		}
 
 		return false;
@@ -123,11 +122,5 @@ public class GeoIpResolverEngine {
 		final String key = fieldKey + "_geocountryisocode";
 		final String countryIsoCode = cityResponse.getRepresentedCountry().getIsoCode();
 		message.addField(key, countryIsoCode);
-	}
-
-	private void addCityNameField(Message message, final String fieldKey, CityResponse cityResponse) {
-		final String key = fieldKey + "_geocityname";
-		final String cityName = cityResponse.getCity().getName();
-		message.addField(key, cityName);
 	}
 }
