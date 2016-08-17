@@ -32,6 +32,7 @@ import java.io.File;
 import java.io.IOException;
 import java.net.InetAddress;
 import java.nio.file.Files;
+import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 
@@ -39,83 +40,89 @@ import static com.codahale.metrics.MetricRegistry.name;
 import static com.google.common.base.Strings.isNullOrEmpty;
 
 public class GeoIpResolverEngine {
-    private static final Logger LOG = LoggerFactory.getLogger(GeoIpResolverEngine.class);
+	private static final Logger LOG = LoggerFactory.getLogger(GeoIpResolverEngine.class);
 
-    private final Timer resolveTime;
-    private DatabaseReader databaseReader;
-    private boolean enabled;
+	private final Timer resolveTime;
+	private DatabaseReader databaseReader;
+	private boolean enabled;
 
+	public GeoIpResolverEngine(GeoIpResolverConfig config, MetricRegistry metricRegistry) {
+		this.resolveTime = metricRegistry.timer(name(GeoIpResolverEngine.class, "resolveTime"));
 
-    public GeoIpResolverEngine(GeoIpResolverConfig config, MetricRegistry metricRegistry) {
-        this.resolveTime = metricRegistry.timer(name(GeoIpResolverEngine.class, "resolveTime"));
+		try {
+			final File database = new File(config.dbPath());
+			if (Files.exists(database.toPath())) {
+				this.databaseReader = new DatabaseReader.Builder(database).build();
+				this.enabled = config.enabled();
+			} else {
+				LOG.warn("GeoIP database file does not exist: {}", config.dbPath());
+				this.enabled = false;
+			}
+		} catch (IOException e) {
+			LOG.error("Could not open GeoIP database {}", config.dbPath(), e);
+			this.enabled = false;
+		}
+	}
 
-        try {
-            final File database = new File(config.dbPath());
-            if (Files.exists(database.toPath())) {
-                this.databaseReader = new DatabaseReader.Builder(database).build();
-                this.enabled = config.enabled();
-            } else {
-                LOG.warn("GeoIP database file does not exist: {}", config.dbPath());
-                this.enabled = false;
-            }
-        } catch (IOException e) {
-            LOG.error("Could not open GeoIP database {}", config.dbPath(), e);
-            this.enabled = false;
-        }
-    }
+	public boolean filter(Message message) {
+		if (!enabled) {
+			return false;
+		}
 
-    public boolean filter(Message message) {
-        if (!enabled) {
-            return false;
-        }
+		for (final Map.Entry<String, Object> field : message.getFields().entrySet()) {
+			final CityResponse cityResponse = getCityResponse(field.getValue());
+			if (cityResponse == null) {
+				continue;
+			}
+			addCoordinatesField(message, field.getKey(), cityResponse);
+			addCountryIsoCodeField(message, field.getKey(), cityResponse);
+			addCityNameField(message, field.getKey(), cityResponse);
+		}
 
-        for (Map.Entry<String, Object> field : message.getFields().entrySet()) {
-            String key = field.getKey() + "_geolocation";
-            final List coordinates = extractGeoLocationInformation(field.getValue());
-            if (coordinates.size() == 2) {
-                // We will store the coordinates as a "lat,long" string
-                final String stringGeoPoint = coordinates.get(1) + "," + coordinates.get(0);
-                message.addField(key, stringGeoPoint);
-            }
-        }
+		return false;
+	}
 
-        return false;
-    }
+	protected CityResponse getCityResponse(final Object fieldValue) {
+		if (!(fieldValue instanceof String) || isNullOrEmpty((String) fieldValue)) {
+			return null;
+		}
 
-    protected List<Double> extractGeoLocationInformation(Object fieldValue) {
-        final List<Double> coordinates = Lists.newArrayList();
+		final String stringFieldValue = (String) fieldValue;
+		final InetAddress ipAddress = this.getIpFromFieldValue(stringFieldValue);
+		if (ipAddress == null) {
+			return null;
+		}
 
-        if (!(fieldValue instanceof String) || isNullOrEmpty((String) fieldValue)) {
-            return coordinates;
-        }
+		try {
+			try (Timer.Context ignored = resolveTime.time()) {
+				return databaseReader.city(ipAddress);
+			}
+		} catch (Exception e) {
+			LOG.debug("Could not get location from IP {}", ipAddress.getHostAddress(), e);
+		}
+		return null;
+	}
 
-        final String stringFieldValue = (String) fieldValue;
-        final InetAddress ipAddress = this.getIpFromFieldValue(stringFieldValue);
-        if (ipAddress == null) {
-            return coordinates;
-        }
+	protected InetAddress getIpFromFieldValue(String fieldValue) {
+		try {
+			return InetAddresses.forString(fieldValue.trim());
+		} catch (IllegalArgumentException e) {
+			// Do nothing, field is not an IP
+		}
 
-        try {
-            try (Timer.Context ignored = resolveTime.time()) {
-                final CityResponse response = databaseReader.city(ipAddress);
-                final Location location = response.getLocation();
-                coordinates.add(location.getLongitude());
-                coordinates.add(location.getLatitude());
-            }
-        } catch (Exception e) {
-            LOG.debug("Could not get location from IP {}", ipAddress.getHostAddress(), e);
-        }
-
-        return coordinates;
-    }
-
-    protected InetAddress getIpFromFieldValue(String fieldValue) {
-        try {
-            return InetAddresses.forString(fieldValue.trim());
-        } catch (IllegalArgumentException e) {
-            // Do nothing, field is not an IP
-        }
-
-        return null;
-    }
+		return null;
+	}
+	
+	private void addCoordinatesField(Message message, final String fieldKey, CityResponse cityResponse) {
+		final Location location = cityResponse.getLocation();
+		final String key = fieldKey + "_geolocation";
+		final String stringGeoPoint = location.getLatitude() + "," + location.getLongitude();
+		message.addField(key, stringGeoPoint);
+	}
+	
+	private void addCountryIsoCodeField(Message message, final String fieldKey, CityResponse cityResponse) {
+		final String key = fieldKey + "_geocountryisocode";
+		final String countryIsoCode = cityResponse.getRepresentedCountry().getIsoCode();
+		message.addField(key, countryIsoCode);
+	}
 }

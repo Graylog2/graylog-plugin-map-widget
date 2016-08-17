@@ -88,10 +88,8 @@ public class GeoIpResolverEngineTest {
     public void extractGeoLocationInformation() throws Exception {
         final GeoIpResolverEngine resolver = new GeoIpResolverEngine(config, metricRegistry);
 
-        List<Double> coordinates = resolver.extractGeoLocationInformation("1.2.3.4");
-        assertEquals(coordinates.size(), 2, "Should extract geo location information from public addresses");
-        List<Double> coordinates2 = resolver.extractGeoLocationInformation("192.168.0.1");
-        assertEquals(coordinates2.size(), 0, "Should not extract geo location information from private addresses");
+        assertNotNull(resolver.getCityResponse("1.2.3.4"), "Should extract geo information from public ip addresses");
+        assertNull(resolver.getCityResponse("192.168.0.1"), "Should not extract geo information from private ip addresses");
     }
 
     @Test
