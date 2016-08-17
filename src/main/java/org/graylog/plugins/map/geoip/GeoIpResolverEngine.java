@@ -112,17 +112,23 @@ public class GeoIpResolverEngine {
 
 		return null;
 	}
-	
+
 	private void addCoordinatesField(Message message, final String fieldKey, CityResponse cityResponse) {
 		final Location location = cityResponse.getLocation();
 		final String key = fieldKey + "_geolocation";
 		final String stringGeoPoint = location.getLatitude() + "," + location.getLongitude();
 		message.addField(key, stringGeoPoint);
 	}
-	
+
 	private void addCountryIsoCodeField(Message message, final String fieldKey, CityResponse cityResponse) {
 		final String key = fieldKey + "_geocountryisocode";
 		final String countryIsoCode = cityResponse.getRepresentedCountry().getIsoCode();
 		message.addField(key, countryIsoCode);
+	}
+
+	private void addCityNameField(Message message, final String fieldKey, CityResponse cityResponse) {
+		final String key = fieldKey + "_geocityname";
+		final String cityName = cityResponse.getCity().getName();
+		message.addField(key, cityName);
 	}
 }
