@@ -14,21 +14,18 @@
  * You should have received a copy of the GNU General Public License
  * along with Graylog.  If not, see <http://www.gnu.org/licenses/>.
  */
-package org.graylog.plugins.map;
+package org.graylog.plugins.map.audit;
 
-import org.graylog.plugins.map.audit.MapWidgetAuditEventTypes;
-import org.graylog.plugins.map.geoip.processor.GeoIpProcessor;
-import org.graylog.plugins.map.rest.MapDataResource;
-import org.graylog.plugins.map.widget.strategy.MapWidgetStrategy;
-import org.graylog2.plugin.PluginModule;
+import com.google.common.collect.ImmutableSet;
+import org.graylog2.audit.PluginAuditEventTypes;
 
-public class MapWidgetModule extends PluginModule {
+import java.util.Set;
+
+public class MapWidgetAuditEventTypes implements PluginAuditEventTypes {
+    private static final Set<String> EVENT_TYPES = ImmutableSet.of();
+
     @Override
-    protected void configure() {
-        addMessageProcessor(GeoIpProcessor.class, GeoIpProcessor.Descriptor.class);
-        addWidgetStrategy(MapWidgetStrategy.class, MapWidgetStrategy.Factory.class);
-        addRestResource(MapDataResource.class);
-
-        addAuditEventTypes(MapWidgetAuditEventTypes.class);
+    public Set<String> auditEventTypes() {
+        return EVENT_TYPES;
     }
 }
