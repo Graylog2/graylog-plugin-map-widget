@@ -16,7 +16,6 @@
  */
 package org.graylog.plugins.map;
 
-import org.graylog.plugins.map.audit.MapWidgetAuditEventTypes;
 import org.graylog.plugins.map.geoip.processor.GeoIpProcessor;
 import org.graylog.plugins.map.rest.MapDataResource;
 import org.graylog.plugins.map.widget.strategy.MapWidgetStrategy;
@@ -28,7 +27,5 @@ public class MapWidgetModule extends PluginModule {
         addMessageProcessor(GeoIpProcessor.class, GeoIpProcessor.Descriptor.class);
         addWidgetStrategy(MapWidgetStrategy.class, MapWidgetStrategy.Factory.class);
         addRestResource(MapDataResource.class);
-
-        addAuditEventTypes(MapWidgetAuditEventTypes.class);
     }
 }
