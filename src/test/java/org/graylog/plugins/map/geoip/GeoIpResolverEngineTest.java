@@ -132,7 +132,7 @@ public class GeoIpResolverEngineTest {
         assertEquals(metricRegistry.timer(name(GeoIpResolverEngine.class, "resolveTime")).getCount(), 3, "Should have looked up three IPs");
         assertNull(message.getField("source_geolocation"), "Should not have resolved private IP");
         assertNull(message.getField("message_geolocation"), "Should have resolved public IP inside message");
-        assertNull(message.getField("gl2_remote_ip_geolocation"), "Should have resolved internal message field");
+        assertNull(message.getField("gl2_remote_ip_geolocation"), "Should not have resolved internal message field");
         assertNotNull(message.getField("extracted_ip_geolocation"), "Should have resolved public IP inside extracted_ip");
         assertTrue(((String) message.getField("extracted_ip_geolocation")).contains(","), "Should include a comma");
         assertNotNull(message.getField("ipv6_geolocation"), "Should have resolved public IPv6 inside ipv6");
