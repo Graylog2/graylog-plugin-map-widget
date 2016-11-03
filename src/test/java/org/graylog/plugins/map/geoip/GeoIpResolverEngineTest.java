@@ -16,26 +16,27 @@
  */
 package org.graylog.plugins.map.geoip;
 
-import com.codahale.metrics.MetricFilter;
-import com.codahale.metrics.MetricRegistry;
-import com.eaio.uuid.UUID;
-import com.google.common.collect.Maps;
-import com.google.common.net.InetAddresses;
-import org.graylog.plugins.map.config.GeoIpResolverConfig;
-import org.graylog2.plugin.Message;
-import org.testng.annotations.AfterMethod;
-import org.testng.annotations.BeforeMethod;
-import org.testng.annotations.Test;
-
-import java.net.URISyntaxException;
-import java.util.Map;
-
 import static com.codahale.metrics.MetricRegistry.name;
 import static org.testng.Assert.assertEquals;
 import static org.testng.Assert.assertFalse;
 import static org.testng.Assert.assertNotNull;
 import static org.testng.Assert.assertNull;
 import static org.testng.Assert.assertTrue;
+
+import java.net.URISyntaxException;
+import java.util.Map;
+
+import org.graylog.plugins.map.config.GeoIpResolverConfig;
+import org.graylog2.plugin.Message;
+import org.testng.annotations.AfterMethod;
+import org.testng.annotations.BeforeMethod;
+import org.testng.annotations.Test;
+
+import com.codahale.metrics.MetricFilter;
+import com.codahale.metrics.MetricRegistry;
+import com.eaio.uuid.UUID;
+import com.google.common.collect.Maps;
+import com.google.common.net.InetAddresses;
 
 public class GeoIpResolverEngineTest {
 
@@ -44,7 +45,8 @@ public class GeoIpResolverEngineTest {
 
     @BeforeMethod
     public void setUp() {
-        config = GeoIpResolverConfig.defaultConfig().toBuilder().enabled(true).dbPath(this.getTestDatabasePath()).build();
+        config = GeoIpResolverConfig.defaultConfig().toBuilder().enabled(true).dbPath(this.getTestDatabasePath())
+                .build();
         metricRegistry = new MetricRegistry();
     }
 
@@ -88,15 +90,21 @@ public class GeoIpResolverEngineTest {
     public void extractGeoLocationInformation() throws Exception {
         final GeoIpResolverEngine resolver = new GeoIpResolverEngine(config, metricRegistry);
 
-        assertTrue(resolver.extractGeoLocationInformation("1.2.3.4").isPresent(), "Should extract geo location information from public addresses");
-        assertFalse(resolver.extractGeoLocationInformation("192.168.0.1").isPresent(), "Should not extract geo location information from private addresses");
-        assertFalse(resolver.extractGeoLocationInformation(42).isPresent(), "Should not extract geo location information numeric fields");
-        assertTrue(resolver.extractGeoLocationInformation(InetAddresses.forString("1.2.3.4")).isPresent(), "Should extract geo location information IP address fields");
+        assertTrue(resolver.getGeoInformation(resolver.extractIpAddress("1.2.3.4")).isPresent(),
+                "Should extract geo location information from public addresses");
+        assertFalse(resolver.getGeoInformation(resolver.extractIpAddress("192.168.0.1")).isPresent(),
+                "Should not extract geo location information from private addresses");
+        assertFalse(resolver.getGeoInformation(resolver.extractIpAddress(42)).isPresent(),
+                "Should not extract geo location information numeric fields");
+        assertTrue(
+                resolver.getGeoInformation(resolver.extractIpAddress(InetAddresses.forString("1.2.3.4"))).isPresent(),
+                "Should extract geo location information IP address fields");
     }
 
     @Test
     public void disabledFilterTest() throws Exception {
-        final GeoIpResolverEngine resolver = new GeoIpResolverEngine(config.toBuilder().enabled(false).build(), metricRegistry);
+        final GeoIpResolverEngine resolver = new GeoIpResolverEngine(config.toBuilder().enabled(false).build(),
+                metricRegistry);
 
         final Map<String, Object> messageFields = Maps.newHashMap();
         messageFields.put("_id", (new UUID()).toString());
@@ -128,12 +136,16 @@ public class GeoIpResolverEngineTest {
         final boolean filtered = resolver.filter(message);
 
         assertFalse(filtered, "Message should not be filtered out");
-        assertEquals(message.getFields().size(), messageFields.size() + 2, "Filter should add new message fields");
-        assertEquals(metricRegistry.timer(name(GeoIpResolverEngine.class, "resolveTime")).getCount(), 3, "Should have looked up three IPs");
+        // 2:field lookups (IPv4/6) * 2:new fields (latitude & longitude, country ISO code)
+        assertEquals(message.getFields().size(), messageFields.size() + (2 * 2),
+                "Filter should add new message fields");
+        assertEquals(metricRegistry.timer(name(GeoIpResolverEngine.class, "resolveTime")).getCount(), 3,
+                "Should have looked up three IPs");
         assertNull(message.getField("source_geolocation"), "Should not have resolved private IP");
         assertNull(message.getField("message_geolocation"), "Should have resolved public IP inside message");
         assertNull(message.getField("gl2_remote_ip_geolocation"), "Should not have resolved internal message field");
-        assertNotNull(message.getField("extracted_ip_geolocation"), "Should have resolved public IP inside extracted_ip");
+        assertNotNull(message.getField("extracted_ip_geolocation"),
+                "Should have resolved public IP inside extracted_ip");
         assertTrue(((String) message.getField("extracted_ip_geolocation")).contains(","), "Should include a comma");
         assertNotNull(message.getField("ipv6_geolocation"), "Should have resolved public IPv6 inside ipv6");
         assertTrue(((String) message.getField("ipv6_geolocation")).contains(","), "Should include a comma");
