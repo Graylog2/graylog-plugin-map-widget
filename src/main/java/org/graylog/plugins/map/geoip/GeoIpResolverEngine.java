@@ -18,109 +18,154 @@ package org.graylog.plugins.map.geoip;
 
 import com.codahale.metrics.MetricRegistry;
 import com.codahale.metrics.Timer;
-import com.google.common.collect.Lists;
+import com.google.auto.value.AutoValue;
 import com.google.common.net.InetAddresses;
 import com.maxmind.geoip2.DatabaseReader;
 import com.maxmind.geoip2.model.CityResponse;
 import com.maxmind.geoip2.record.Location;
+
 import org.graylog.plugins.map.config.GeoIpResolverConfig;
 import org.graylog2.plugin.Message;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
+import javax.annotation.Nullable;
 import java.io.File;
 import java.io.IOException;
 import java.net.InetAddress;
 import java.nio.file.Files;
-import java.util.List;
 import java.util.Map;
+import java.util.Optional;
 
 import static com.codahale.metrics.MetricRegistry.name;
-import static com.google.common.base.Strings.isNullOrEmpty;
 
 public class GeoIpResolverEngine {
-	private static final Logger LOG = LoggerFactory.getLogger(GeoIpResolverEngine.class);
 
-	private final Timer resolveTime;
-	private DatabaseReader databaseReader;
-	private boolean enabled;
+    private static final Logger LOG = LoggerFactory.getLogger(GeoIpResolverEngine.class);
+    private static final String INTERNAL_FIELD_PREFIX = "gl2_";
 
-	public GeoIpResolverEngine(GeoIpResolverConfig config, MetricRegistry metricRegistry) {
-		this.resolveTime = metricRegistry.timer(name(GeoIpResolverEngine.class, "resolveTime"));
+    private final String FIELD_SEPARATOR = "_";
+    private final String FIELD_GEOLOCATION = "geolocation";
+    private final String FIELD_COUNTRY = "geocountrycode";
 
-		try {
-			final File database = new File(config.dbPath());
-			if (Files.exists(database.toPath())) {
-				this.databaseReader = new DatabaseReader.Builder(database).build();
-				this.enabled = config.enabled();
-			} else {
-				LOG.warn("GeoIP database file does not exist: {}", config.dbPath());
-				this.enabled = false;
-			}
-		} catch (IOException e) {
-			LOG.error("Could not open GeoIP database {}", config.dbPath(), e);
-			this.enabled = false;
-		}
-	}
+    private final Timer resolveTime;
+    private DatabaseReader databaseReader;
+    private boolean enabled;
 
-	public boolean filter(Message message) {
-		if (!enabled) {
-			return false;
-		}
+    public GeoIpResolverEngine(GeoIpResolverConfig config, MetricRegistry metricRegistry) {
+        this.resolveTime = metricRegistry.timer(name(GeoIpResolverEngine.class, "resolveTime"));
 
-		for (final Map.Entry<String, Object> field : message.getFields().entrySet()) {
-			final CityResponse cityResponse = getCityResponse(field.getValue());
-			if (cityResponse == null) {
-				continue;
-			}
-			addCoordinatesField(message, field.getKey(), cityResponse);
-			addCountryIsoCodeField(message, field.getKey(), cityResponse);
-		}
+        try {
+            final File database = new File(config.dbPath());
+            if (Files.exists(database.toPath())) {
+                this.databaseReader = new DatabaseReader.Builder(database).build();
+                this.enabled = config.enabled();
+            } else {
+                LOG.warn("GeoIP database file does not exist: {}", config.dbPath());
+                this.enabled = false;
+            }
+        } catch (IOException e) {
+            LOG.error("Could not open GeoIP database {}", config.dbPath(), e);
+            this.enabled = false;
+        }
+    }
 
-		return false;
-	}
+    public boolean filter(Message message) {
+        if (!enabled) {
+            return false;
+        }
 
-	protected CityResponse getCityResponse(final Object fieldValue) {
-		if (!(fieldValue instanceof String) || isNullOrEmpty((String) fieldValue)) {
-			return null;
-		}
+        for (final Map.Entry<String, Object> field : message.getFields().entrySet()) {
 
-		final String stringFieldValue = (String) fieldValue;
-		final InetAddress ipAddress = this.getIpFromFieldValue(stringFieldValue);
-		if (ipAddress == null) {
-			return null;
-		}
+            final String key = field.getKey();
+            if (!key.startsWith(INTERNAL_FIELD_PREFIX)) {
 
-		try {
-			try (Timer.Context ignored = resolveTime.time()) {
-				return databaseReader.city(ipAddress);
-			}
-		} catch (Exception e) {
-			LOG.debug("Could not get location from IP {}", ipAddress.getHostAddress(), e);
-		}
-		return null;
-	}
+                final Optional<InetAddress> ipAddress = extractIpAddress(field.getValue());
+                if (ipAddress.isPresent()) {
 
-	protected InetAddress getIpFromFieldValue(String fieldValue) {
-		try {
-			return InetAddresses.forString(fieldValue.trim());
-		} catch (IllegalArgumentException e) {
-			// Do nothing, field is not an IP
-		}
+                    final Optional<CityResponse> cityResponse = getGeoInformation(ipAddress);
+                    if (cityResponse.isPresent()) {
+                        // set field: geo location (latitude, longitude)
+                        // We will store the coordinates as a "lat,long" string
+                        extractCoordinates(cityResponse.get()).ifPresent(
+                                c -> addField(message, key, FIELD_GEOLOCATION, c.latitude() + "," + c.longitude()));
 
-		return null;
-	}
+                        // set field: country iso code (ISO 3166-1)
+                        extractCountryIsoCode(cityResponse.get())
+                                .ifPresent(c -> addField(message, key, FIELD_COUNTRY, c.isoCode()));
+                    }
+                }
+            }
+        }
 
-	private void addCoordinatesField(Message message, final String fieldKey, CityResponse cityResponse) {
-		final Location location = cityResponse.getLocation();
-		final String key = fieldKey + "_geolocation";
-		final String stringGeoPoint = location.getLatitude() + "," + location.getLongitude();
-		message.addField(key, stringGeoPoint);
-	}
+        return false;
+    }
 
-	private void addCountryIsoCodeField(Message message, final String fieldKey, CityResponse cityResponse) {
-		final String key = fieldKey + "_geocountryisocode";
-		final String countryIsoCode = cityResponse.getRepresentedCountry().getIsoCode();
-		message.addField(key, countryIsoCode);
-	}
+    protected Optional<InetAddress> extractIpAddress(final Object fieldValue) {
+        if (fieldValue instanceof InetAddress) {
+            return Optional.ofNullable((InetAddress) fieldValue);
+        } else if (fieldValue instanceof String) {
+            return Optional.ofNullable(getIpFromFieldValue((String) fieldValue));
+        }
+
+        return Optional.empty();
+    }
+
+    protected Optional<CityResponse> getGeoInformation(Optional<InetAddress> ipAddress) {
+        if (ipAddress.isPresent()) {
+            try (Timer.Context ignored = resolveTime.time()) {
+                return Optional.ofNullable(databaseReader.city(ipAddress.get()));
+            } catch (Exception e) {
+                LOG.debug("Could not get location from IP {}", ipAddress.get().getHostAddress(), e);
+            }
+        }
+        return Optional.empty();
+    }
+
+    private Optional<Coordinates> extractCoordinates(final CityResponse cityResponse) {
+        Location location = cityResponse.getLocation();
+        return Optional.ofNullable(Coordinates.create(location.getLatitude(), location.getLongitude()));
+    }
+
+    private Optional<Country> extractCountryIsoCode(final CityResponse cityResponse) {
+        // We will use the MaxMind DB field 'country' and not
+        // 'registered_country' or 'represented_country'
+        // https://dev.maxmind.com/geoip/geoip2/web-services/#country
+        return Optional.ofNullable(Country.create(cityResponse.getCountry().getIsoCode()));
+    }
+
+    private void addField(final Message message, final String key, final String keyAddon, final String value) {
+        message.addField(key + FIELD_SEPARATOR + keyAddon, value);
+    }
+
+    @Nullable
+    protected InetAddress getIpFromFieldValue(final String fieldValue) {
+        try {
+            return InetAddresses.forString(fieldValue.trim());
+        } catch (IllegalArgumentException e) {
+            // Do nothing, field is not an IP
+        }
+
+        return null;
+    }
+
+    @AutoValue
+    static abstract class Country {
+        public abstract String isoCode();
+
+        public static Country create(String countryIsoCode) {
+            return new AutoValue_GeoIpResolverEngine_Country(countryIsoCode);
+        }
+    }
+
+    @AutoValue
+    static abstract class Coordinates {
+        public abstract double latitude();
+
+        public abstract double longitude();
+
+        public static Coordinates create(double latitude, double longitude) {
+            return new AutoValue_GeoIpResolverEngine_Coordinates(latitude, longitude);
+        }
+    }
 }
