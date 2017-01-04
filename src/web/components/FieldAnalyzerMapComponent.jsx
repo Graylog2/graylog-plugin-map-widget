@@ -7,6 +7,8 @@ import { Button } from 'react-bootstrap';
 import { MapsActions, MapsStore } from 'stores/MapsStore';
 import MapVisualization from 'components/MapVisualization';
 import EventHandlersThrottler from 'util/EventHandlersThrottler';
+import StoreProvider from 'injection/StoreProvider';
+const RefreshStore = StoreProvider.getStore('Refresh');
 
 const FieldAnalyzerMapComponent = React.createClass({
   propTypes: {
@@ -19,9 +21,10 @@ const FieldAnalyzerMapComponent = React.createClass({
     page: React.PropTypes.number.isRequired,
     rangeType: React.PropTypes.string.isRequired,
     rangeParams: React.PropTypes.object.isRequired,
+    forceFetch: React.PropTypes.bool,
   },
 
-  mixins: [Reflux.connect(MapsStore)],
+  mixins: [Reflux.connect(MapsStore), Reflux.listenTo(RefreshStore, '_setupTimer', '_setupTimer')],
 
   getInitialState() {
     return {
@@ -37,7 +40,28 @@ const FieldAnalyzerMapComponent = React.createClass({
   componentWillUnmount() {
     window.removeEventListener('resize', this._onResize);
   },
+  componentWillReceiveProps(nextProps) {
+    // Reload values when executed search changes
+    if (this.props.query !== nextProps.query ||
+        this.props.rangeType !== nextProps.rangeType ||
+        JSON.stringify(this.props.rangeParams) !== JSON.stringify(nextProps.rangeParams) ||
+        this.props.stream !== nextProps.stream ||
+        nextProps.forceFetch) {
+        this._loadData();
+    }
+  },
 
+  _setupTimer(refresh) {
+    this._stopTimer();
+    if (refresh.enabled) {
+      this.timer = setInterval(this._loadData, refresh.interval);
+    }
+  },
+  _stopTimer() {
+    if (this.timer) {
+      clearInterval(this.timer);
+    }
+  },
   DEFAULT_WIDTH: 800,
   WIDGET_TYPE: 'org.graylog.plugins.map.widget.strategy.MapWidgetStrategy',
   eventThrottler: new EventHandlersThrottler(),
