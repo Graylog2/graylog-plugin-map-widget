@@ -47,14 +47,14 @@ const FieldAnalyzerMapComponent = React.createClass({
         JSON.stringify(this.props.rangeParams) !== JSON.stringify(nextProps.rangeParams) ||
         this.props.stream !== nextProps.stream ||
         nextProps.forceFetch) {
-        this._loadData();
+        this._loadData(nextProps);
     }
   },
 
   _setupTimer(refresh) {
     this._stopTimer();
     if (refresh.enabled) {
-      this.timer = setInterval(this._loadData, refresh.interval);
+      this.timer = setInterval(() => this._loadData(this.props), refresh.interval);
     }
   },
   _stopTimer() {
@@ -70,7 +70,7 @@ const FieldAnalyzerMapComponent = React.createClass({
     this.setState({field: field}, () => {
       // We need to update the map width when the container is rendered
       this._updateMapWidth();
-      this._loadData();
+      this._loadData(this.props);
     });
   },
 
@@ -86,13 +86,13 @@ const FieldAnalyzerMapComponent = React.createClass({
     return this.props.stream ? this.props.stream.id : null;
   },
 
-  _loadData() {
+  _loadData(props) {
     if (this.state.field !== undefined) {
       const promise = MapsActions.getMapData(
-        this.props.query,
+        props.query,
         this.state.field,
-        this.props.rangeType,
-        this.props.rangeParams,
+        props.rangeType,
+        props.rangeParams,
         this._getStreamId()
       );
       promise.catch(() => this._resetStatus());
