@@ -142,7 +142,6 @@ public class GeoIpResolverEngineTest {
         final boolean filtered = resolver.filter(message);
 
         assertFalse(filtered, "Message should not be filtered out");
-        assertEquals(message.getFields().size(), messageFields.size() + 2*3, "Filter should add new message fields");
         assertEquals(metricRegistry.timer(name(GeoIpResolverEngine.class, "resolveTime")).getCount(), 3, "Should have looked up three IPs");
         assertFieldNotResolved(message, "source", "Should not have resolved private IP");
         assertFieldNotResolved(message, "message", "Should have resolved public IP");
