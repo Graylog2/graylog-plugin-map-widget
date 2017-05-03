@@ -19,17 +19,24 @@ import org.graylog.plugins.map.config.DatabaseType;
 import org.graylog2.plugin.lookup.LookupDataAdapter;
 import org.graylog2.plugin.lookup.LookupDataAdapterConfiguration;
 import org.graylog2.plugin.lookup.LookupResult;
+import org.graylog2.plugin.utilities.FileInfo;
 import org.hibernate.validator.constraints.NotEmpty;
+import org.joda.time.Duration;
 import org.slf4j.Logger;
 
+import java.io.File;
+import java.io.IOException;
 import java.net.InetAddress;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.Paths;
+import java.util.concurrent.ScheduledExecutorService;
 import java.util.concurrent.TimeUnit;
+import java.util.concurrent.atomic.AtomicReference;
 
 import javax.annotation.Nullable;
 import javax.inject.Inject;
+import javax.inject.Named;
 import javax.validation.constraints.Min;
 import javax.validation.constraints.NotNull;
 
@@ -41,11 +48,13 @@ public class MaxmindDataAdapter extends LookupDataAdapter {
 
     public static final String NAME = "maxmind_geoip";
     private final Config config;
-    private DatabaseReader databaseReader;
+    private final AtomicReference<DatabaseReader> databaseReader = new AtomicReference<>();
+    private FileInfo fileInfo;
 
     @Inject
-    protected MaxmindDataAdapter(@Assisted LookupDataAdapterConfiguration config) {
-        super(config);
+    protected MaxmindDataAdapter(@Assisted LookupDataAdapterConfiguration config,
+                                 @Named("daemonScheduler") ScheduledExecutorService scheduler) {
+        super(config, scheduler);
         this.config = (Config) config;
     }
 
@@ -55,12 +64,50 @@ public class MaxmindDataAdapter extends LookupDataAdapter {
         if (!Files.isReadable(path)) {
             throw new IllegalArgumentException("Cannot read database file: " + config.path());
         }
-        this.databaseReader = new DatabaseReader.Builder(path.toFile()).build();
+        fileInfo = FileInfo.forPath(path);
+        this.databaseReader.set(loadReader(path.toFile()));
     }
 
     @Override
     protected void doStop() throws Exception {
-        databaseReader.close();
+        databaseReader.get().close();
+    }
+
+    @Override
+    protected Duration refreshInterval() {
+        if (config.checkIntervalUnit() == null || config.checkInterval() == 0) {
+            return Duration.ZERO;
+        }
+        //noinspection ConstantConditions
+        return Duration.millis(config.checkIntervalUnit().toMillis(config.checkInterval()));
+    }
+
+    @Override
+    protected void doRefresh() throws Exception {
+        try {
+            final FileInfo.Change databaseFileCheck = fileInfo.checkForChange();
+            if (!databaseFileCheck.isChanged()) {
+                return;
+            }
+
+            // file has different attributes, let's reload it
+            LOG.debug("MaxMind database file has changed, reloading it from {}", config.path());
+            final DatabaseReader oldReader = this.databaseReader.get();
+            try {
+                this.databaseReader.set(loadReader(Paths.get(config.path()).toFile()));
+                getLookupTable().cache().purge();
+                oldReader.close();
+                fileInfo = databaseFileCheck.fileInfo();
+            } catch (IOException e) {
+                LOG.warn("Unable to load changed database file, leaving old one intact. Error message: {}", e.getMessage());
+            }
+        } catch (IllegalArgumentException iae) {
+            LOG.error("Unable to refresh MaxMind database file: {}", iae.getMessage());
+        }
+    }
+
+    private DatabaseReader loadReader(File file) throws IOException {
+        return new DatabaseReader.Builder(file).build();
     }
 
     @Override
@@ -77,10 +124,11 @@ public class MaxmindDataAdapter extends LookupDataAdapter {
                 return LookupResult.empty();
             }
         }
+        final DatabaseReader reader = this.databaseReader.get();
         switch (config.dbType()) {
             case MAXMIND_CITY:
                 try {
-                    final CityResponse city = databaseReader.city(addr);
+                    final CityResponse city = reader.city(addr);
                     final ImmutableMap.Builder<Object, Object> map = ImmutableMap.builder();
                     map.put("city", city.getCity());
                     map.put("continent", city.getContinent());
@@ -95,12 +143,12 @@ public class MaxmindDataAdapter extends LookupDataAdapter {
                 } catch (AddressNotFoundException nfe) {
                     return LookupResult.empty();
                 } catch (Exception e) {
-                    LOG.warn("Unable too look up IP address, returning empty result.", e);
+                    LOG.warn("Unable to look up IP address, returning empty result.", e);
                     return LookupResult.empty();
                 }
             case MAXMIND_COUNTRY:
                 try {
-                    final CountryResponse country = databaseReader.country(addr);
+                    final CountryResponse country = reader.country(addr);
                     final ImmutableMap.Builder<Object, Object> map = ImmutableMap.builder();
                     map.put("continent", country.getContinent());
                     map.put("country", country.getCountry());
@@ -111,7 +159,7 @@ public class MaxmindDataAdapter extends LookupDataAdapter {
                 } catch (AddressNotFoundException nfe) {
                     return LookupResult.empty();
                 } catch (Exception e) {
-                    LOG.warn("Unable too look up IP address, returning empty result.", e);
+                    LOG.warn("Unable to look up IP address, returning empty result.", e);
                     return LookupResult.empty();
                 }
         }
