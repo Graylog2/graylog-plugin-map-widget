@@ -1,17 +1,19 @@
 package org.graylog.plugins.map.geoip;
 
-import com.fasterxml.jackson.annotation.JsonAutoDetect;
-import com.fasterxml.jackson.annotation.JsonProperty;
-import com.fasterxml.jackson.annotation.JsonTypeName;
-import com.fasterxml.jackson.databind.annotation.JsonDeserialize;
 import com.google.auto.value.AutoValue;
 import com.google.common.collect.ImmutableMap;
 import com.google.common.net.InetAddresses;
 import com.google.inject.assistedinject.Assisted;
+
+import com.fasterxml.jackson.annotation.JsonAutoDetect;
+import com.fasterxml.jackson.annotation.JsonProperty;
+import com.fasterxml.jackson.annotation.JsonTypeName;
+import com.fasterxml.jackson.databind.annotation.JsonDeserialize;
 import com.maxmind.geoip2.DatabaseReader;
 import com.maxmind.geoip2.exception.AddressNotFoundException;
 import com.maxmind.geoip2.model.CityResponse;
 import com.maxmind.geoip2.model.CountryResponse;
+
 import org.graylog.autovalue.WithBeanGetter;
 import org.graylog.plugins.map.config.DatabaseType;
 import org.graylog2.plugin.lookup.LookupDataAdapter;
@@ -22,11 +24,6 @@ import org.hibernate.validator.constraints.NotEmpty;
 import org.joda.time.Duration;
 import org.slf4j.Logger;
 
-import javax.annotation.Nullable;
-import javax.inject.Inject;
-import javax.inject.Named;
-import javax.validation.constraints.Min;
-import javax.validation.constraints.NotNull;
 import java.io.File;
 import java.io.IOException;
 import java.net.InetAddress;
@@ -36,6 +33,12 @@ import java.nio.file.Paths;
 import java.util.concurrent.ScheduledExecutorService;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicReference;
+
+import javax.annotation.Nullable;
+import javax.inject.Inject;
+import javax.inject.Named;
+import javax.validation.constraints.Min;
+import javax.validation.constraints.NotNull;
 
 import static org.slf4j.LoggerFactory.getLogger;
 
@@ -49,20 +52,30 @@ public class MaxmindDataAdapter extends LookupDataAdapter {
     private FileInfo fileInfo;
 
     @Inject
-    protected MaxmindDataAdapter(@Assisted LookupDataAdapterConfiguration config,
+    protected MaxmindDataAdapter(@Assisted("id") String id,
+                                 @Assisted("name") String name,
+                                 @Assisted LookupDataAdapterConfiguration config,
                                  @Named("daemonScheduler") ScheduledExecutorService scheduler) {
-        super(config, scheduler);
+        super(id, name, config, scheduler);
         this.config = (Config) config;
     }
 
     @Override
     protected void doStart() throws Exception {
         Path path = Paths.get(config.path());
-        if (!Files.isReadable(path)) {
-            throw new IllegalArgumentException("Cannot read database file: " + config.path());
-        }
         fileInfo = FileInfo.forPath(path);
-        this.databaseReader.set(loadReader(path.toFile()));
+
+        if (!Files.isReadable(path)) {
+            LOG.warn("Cannot read database file {}", config.path());
+            setError(new IllegalStateException("Cannot read database file " + config.path()));
+        } else {
+            try {
+                this.databaseReader.set(loadReader(path.toFile()));
+            } catch (Exception e) {
+                LOG.warn("Unable to read data base file {}", config.path());
+                setError(e);
+            }
+        }
     }
 
     @Override
@@ -82,6 +95,7 @@ public class MaxmindDataAdapter extends LookupDataAdapter {
     @Override
     protected void doRefresh() throws Exception {
         try {
+            clearError();
             final FileInfo.Change databaseFileCheck = fileInfo.checkForChange();
             if (!databaseFileCheck.isChanged()) {
                 return;
@@ -93,13 +107,17 @@ public class MaxmindDataAdapter extends LookupDataAdapter {
             try {
                 this.databaseReader.set(loadReader(Paths.get(config.path()).toFile()));
                 getLookupTable().cache().purge();
-                oldReader.close();
+                if (oldReader != null) {
+                    oldReader.close();
+                }
                 fileInfo = databaseFileCheck.fileInfo();
             } catch (IOException e) {
                 LOG.warn("Unable to load changed database file, leaving old one intact. Error message: {}", e.getMessage());
+                setError(e);
             }
         } catch (IllegalArgumentException iae) {
             LOG.error("Unable to refresh MaxMind database file: {}", iae.getMessage());
+            setError(iae);
         }
     }
 
@@ -173,7 +191,9 @@ public class MaxmindDataAdapter extends LookupDataAdapter {
 
     public interface Factory extends LookupDataAdapter.Factory<MaxmindDataAdapter> {
         @Override
-        MaxmindDataAdapter create(LookupDataAdapterConfiguration configuration);
+        MaxmindDataAdapter create(@Assisted("id") String id,
+                                  @Assisted("name") String name,
+                                  LookupDataAdapterConfiguration configuration);
 
         @Override
         MaxmindDataAdapter.Descriptor getDescriptor();
