@@ -46,6 +46,7 @@ public class MaxmindDataAdapter extends LookupDataAdapter {
     public static final String NAME = "maxmind_geoip";
     private final Config config;
     private final AtomicReference<DatabaseReader> databaseReader = new AtomicReference<>();
+    @Nullable
     private FileInfo fileInfo;
 
     @Inject
@@ -82,19 +83,23 @@ public class MaxmindDataAdapter extends LookupDataAdapter {
     @Override
     protected void doRefresh() throws Exception {
         try {
-            final FileInfo.Change databaseFileCheck = fileInfo.checkForChange();
-            if (!databaseFileCheck.isChanged()) {
-                return;
+            FileInfo.Change databaseFileCheck = null;
+            if (fileInfo != null) {
+                databaseFileCheck = fileInfo.checkForChange();
+                if (!databaseFileCheck.isChanged()) {
+                    return;
+                }
             }
 
             // file has different attributes, let's reload it
             LOG.debug("MaxMind database file has changed, reloading it from {}", config.path());
             final DatabaseReader oldReader = this.databaseReader.get();
             try {
-                this.databaseReader.set(loadReader(Paths.get(config.path()).toFile()));
+                final Path path = Paths.get(config.path());
+                this.databaseReader.set(loadReader(path.toFile()));
                 getLookupTable().cache().purge();
                 oldReader.close();
-                fileInfo = databaseFileCheck.fileInfo();
+                fileInfo = (databaseFileCheck == null) ? FileInfo.forPath(path) : databaseFileCheck.fileInfo();
             } catch (IOException e) {
                 LOG.warn("Unable to load changed database file, leaving old one intact. Error message: {}", e.getMessage());
             }
