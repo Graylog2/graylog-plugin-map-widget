@@ -93,9 +93,8 @@ public class MaxmindDataAdapter extends LookupDataAdapter {
     @Override
     protected void doRefresh(LookupCachePurge cachePurge) throws Exception {
         try {
-            clearError();
             final FileInfo.Change databaseFileCheck = fileInfo.checkForChange();
-            if (!databaseFileCheck.isChanged()) {
+            if (!databaseFileCheck.isChanged() && !getError().isPresent()) {
                 return;
             }
 
@@ -109,6 +108,7 @@ public class MaxmindDataAdapter extends LookupDataAdapter {
                     oldReader.close();
                 }
                 fileInfo = databaseFileCheck.fileInfo();
+                clearError();
             } catch (IOException e) {
                 LOG.warn("Unable to load changed database file, leaving old one intact. Error message: {}", e.getMessage());
                 setError(e);
