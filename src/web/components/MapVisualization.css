@@ -1,3 +1,14 @@
 .leaflet-top, .leaflet-bottom {
     z-index: 999; /* So it displays below bootstrap dropdowns */
 }
+
+@media print {
+    :local(.map) {
+        margin: 0 auto;
+    }
+
+    /* Hide zoom controls */
+    .leaflet-control-container {
+        display: none;
+    }
+}
