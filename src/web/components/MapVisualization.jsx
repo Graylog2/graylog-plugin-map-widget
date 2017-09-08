@@ -14,10 +14,14 @@ const MapVisualization = React.createClass({
     width: PropTypes.number,
     url: PropTypes.string,
     attribution: PropTypes.string,
+    interactive: PropTypes.bool,
+    onRenderComplete: PropTypes.func,
   },
   getDefaultProps() {
     return {
       data: {},
+      interactive: true,
+      onRenderComplete: () => {},
     };
   },
   getInitialState() {
@@ -49,7 +53,7 @@ const MapVisualization = React.createClass({
     );
   },
   _onZoomChange(event) {
-    this.setState({zoomLevel: event.target.getZoom()});
+    this.setState({ zoomLevel: event.target.getZoom() });
   },
   _getBucket(value, bucketCount, minValue, maxValue, increment) {
     // Calculate bucket size based on min/max value and the number of buckets.
@@ -59,24 +63,25 @@ const MapVisualization = React.createClass({
 
     return bucket + increment;
   },
-  render() {
 
-    const data = this.props.data.terms;
-    const occurrences = Object.keys(data).map((k) => data[k]);
+  render() {
+    const { data, id, height, width, url, attribution, interactive, onRenderComplete } = this.props;
+
+    const terms = data.terms;
+    const occurrences = Object.keys(terms).map(k => terms[k]);
     const minOccurrences = occurrences.reduce((prev, cur) => Math.min(prev, cur), Infinity);
     const maxOccurrences = occurrences.reduce((prev, cur) => Math.max(prev, cur), -Infinity);
     const increment = this._getBucket(this.state.zoomLevel, this.MARKER_RADIUS_INCREMENT_SIZES, 1, 10, 1);
 
-    const coordinates = Object.keys(data);
-    const markers = coordinates.map(aCoordinates => this._formatMarker(aCoordinates, data[aCoordinates], minOccurrences, maxOccurrences, increment));
-    const leafletUrl = this.props.url || this.DEFAULT_URL;
-    const leafletAttribution = this.props.attribution || this.DEFAULT_ATTRIBUTION;
+    const coordinates = Object.keys(terms);
+    const markers = coordinates.map(aCoordinates => this._formatMarker(aCoordinates, terms[aCoordinates], minOccurrences, maxOccurrences, increment));
+    const leafletUrl = url || this.DEFAULT_URL;
+    const leafletAttribution = attribution || this.DEFAULT_ATTRIBUTION;
 
     return (
-      <Map center={this.position} zoom={this.state.zoomLevel} onZoomend={this._onZoomChange} style={{height: this.props.height, width: this.props.width}} scrollWheelZoom={false}>
-        <TileLayer url={leafletUrl}
-                   maxZoom={19}
-                   attribution={leafletAttribution}/>
+      <Map id={`visualization-${id}`} center={this.position} zoom={this.state.zoomLevel} onZoomend={this._onZoomChange} className={style.map}
+           style={{ height: height, width: width }} scrollWheelZoom={false} animate={interactive} whenReady={onRenderComplete}>
+        <TileLayer url={leafletUrl} maxZoom={19} attribution={leafletAttribution} />
         {markers}
       </Map>
     );
