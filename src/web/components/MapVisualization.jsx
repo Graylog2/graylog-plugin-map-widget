@@ -1,7 +1,9 @@
 import PropTypes from 'prop-types';
 import React from 'react';
 import { Map, TileLayer, CircleMarker, Popup } from 'react-leaflet';
-import { Spinner } from 'components/common';
+
+import {} from 'leaflet/dist/leaflet.css';
+import style from './MapVisualization.css';
 
 const MapVisualization = React.createClass({
   propTypes: {
@@ -21,30 +23,12 @@ const MapVisualization = React.createClass({
   getInitialState() {
     return {
       zoomLevel: 1,
-      isComponentMounted: false, // Leaflet operates directly with the DOM, so we need to wait until it is ready :grumpy:
     };
   },
-  componentDidMount() {
-    this.leafletStyle.use();
-    this.style.use();
-    this._onComponentMount();
-  },
-
-  componentWillUnmount() {
-    this.leafletStyle.unuse();
-    this.style.unuse();
-  },
-
-  _onComponentMount() {
-    this.setState({isComponentMounted: true});
-  },
-
-  leafletStyle: require('!style/useable!css!leaflet/dist/leaflet.css'),
-  style: require('!style/useable!css!./MapVisualization.css'),
 
   position: [0, 0],
   DEFAULT_URL: 'https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png',
-  DEFAULT_ATTRIBUTION: `&copy; <a href="http://osm.org/copyright" target="_blank">OpenStreetMap</a> contributors`,
+  DEFAULT_ATTRIBUTION: '&copy; <a href="http://osm.org/copyright" target="_blank">OpenStreetMap</a> contributors',
   MARKER_RADIUS_SIZES: 10,
   MARKER_RADIUS_INCREMENT_SIZES: 10,
   // Coordinates are given as "lat,long"
@@ -76,9 +60,6 @@ const MapVisualization = React.createClass({
     return bucket + increment;
   },
   render() {
-    if (!this.state.isComponentMounted) {
-      return <Spinner/>;
-    }
 
     const data = this.props.data.terms;
     const occurrences = Object.keys(data).map((k) => data[k]);
