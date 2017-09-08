@@ -1,3 +1,4 @@
+/* eslint-env browser */
 import PropTypes from 'prop-types';
 import React from 'react';
 import { Map, TileLayer, CircleMarker, Popup } from 'react-leaflet';
@@ -9,9 +10,8 @@ const MapVisualization = React.createClass({
   propTypes: {
     id: PropTypes.string.isRequired,
     data: PropTypes.object,
-    config: PropTypes.object.isRequired,
-    height: PropTypes.number,
-    width: PropTypes.number,
+    height: PropTypes.number.isRequired,
+    width: PropTypes.number.isRequired,
     url: PropTypes.string,
     attribution: PropTypes.string,
     interactive: PropTypes.bool,
@@ -20,10 +20,13 @@ const MapVisualization = React.createClass({
   getDefaultProps() {
     return {
       data: {},
+      url: 'https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png',
+      attribution: '&copy; <a href="http://osm.org/copyright" target="_blank">OpenStreetMap</a> contributors',
       interactive: true,
       onRenderComplete: () => {},
     };
   },
+
   getInitialState() {
     return {
       zoomLevel: 1,
@@ -42,8 +45,6 @@ const MapVisualization = React.createClass({
 
   _map: undefined,
   position: [0, 0],
-  DEFAULT_URL: 'https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png',
-  DEFAULT_ATTRIBUTION: '&copy; <a href="http://osm.org/copyright" target="_blank">OpenStreetMap</a> contributors',
   MARKER_RADIUS_SIZES: 10,
   MARKER_RADIUS_INCREMENT_SIZES: 10,
 
@@ -60,14 +61,15 @@ const MapVisualization = React.createClass({
     const formattedCoordinates = coordinates.split(',').map(component => Number(component));
     const radius = this._getBucket(occurrences, this.MARKER_RADIUS_SIZES, min, max, increment);
     return (
-      <CircleMarker key={coordinates} center={formattedCoordinates} radius={radius} color="#AF2228" fillColor="#D3242B" weight={2} opacity={0.8}>
+      <CircleMarker key={coordinates} center={formattedCoordinates} radius={radius} color="#AF2228" fillColor="#D3242B"
+                    weight={2} opacity={0.8}>
         <Popup>
-            <dl>
-              <dt>Coordinates:</dt>
-              <dd>{coordinates}</dd>
-              <dt>Number of occurrences:</dt>
-              <dd>{occurrences}</dd>
-            </dl>
+          <dl>
+            <dt>Coordinates:</dt>
+            <dd>{coordinates}</dd>
+            <dt>Number of occurrences:</dt>
+            <dd>{occurrences}</dd>
+          </dl>
         </Popup>
       </CircleMarker>
     );
@@ -95,13 +97,19 @@ const MapVisualization = React.createClass({
 
     const coordinates = Object.keys(terms);
     const markers = coordinates.map(aCoordinates => this._formatMarker(aCoordinates, terms[aCoordinates], minOccurrences, maxOccurrences, increment));
-    const leafletUrl = url || this.DEFAULT_URL;
-    const leafletAttribution = attribution || this.DEFAULT_ATTRIBUTION;
 
     return (
-      <Map id={`visualization-${id}`} center={this.position} zoom={this.state.zoomLevel} onZoomend={this._onZoomChange} className={style.map}
-           style={{ height: height, width: width }} scrollWheelZoom={false} animate={interactive} whenReady={onRenderComplete}>
-        <TileLayer url={leafletUrl} maxZoom={19} attribution={leafletAttribution} />
+      <Map ref={(c) => { this._map = c; }}
+           id={`visualization-${id}`}
+           center={this.position}
+           zoom={this.state.zoomLevel}
+           onZoomend={this._onZoomChange}
+           className={style.map}
+           style={{ height: height, width: width }}
+           scrollWheelZoom={false}
+           animate={interactive}
+           whenReady={onRenderComplete}>
+        <TileLayer url={url} maxZoom={19} attribution={attribution} />
         {markers}
       </Map>
     );
