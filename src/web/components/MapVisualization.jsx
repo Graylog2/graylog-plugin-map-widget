@@ -30,11 +30,31 @@ const MapVisualization = React.createClass({
     };
   },
 
+  componentDidMount() {
+    this._forceMapUpdate();
+  },
+
+  componentDidUpdate(prevProps) {
+    if (this.props.height !== prevProps.height || this.props.width !== prevProps.width) {
+      this._forceMapUpdate();
+    }
+  },
+
+  _map: undefined,
   position: [0, 0],
   DEFAULT_URL: 'https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png',
   DEFAULT_ATTRIBUTION: '&copy; <a href="http://osm.org/copyright" target="_blank">OpenStreetMap</a> contributors',
   MARKER_RADIUS_SIZES: 10,
   MARKER_RADIUS_INCREMENT_SIZES: 10,
+
+  // Workaround to avoid wrong placed markers or empty tiles if the map container size changed.
+  _forceMapUpdate() {
+    if (this._map) {
+      this._map.leafletElement.invalidateSize();
+      window.dispatchEvent(new Event('resize'));
+    }
+  },
+
   // Coordinates are given as "lat,long"
   _formatMarker(coordinates, occurrences, min, max, increment) {
     const formattedCoordinates = coordinates.split(',').map(component => Number(component));
