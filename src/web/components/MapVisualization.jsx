@@ -33,10 +33,6 @@ const MapVisualization = React.createClass({
     };
   },
 
-  componentDidMount() {
-    this._forceMapUpdate();
-  },
-
   componentDidUpdate(prevProps) {
     if (this.props.height !== prevProps.height || this.props.width !== prevProps.width) {
       this._forceMapUpdate();
@@ -53,8 +49,8 @@ const MapVisualization = React.createClass({
   // Workaround to avoid wrong placed markers or empty tiles if the map container size changed.
   _forceMapUpdate() {
     if (this._map) {
-      this._map.leafletElement.invalidateSize();
       window.dispatchEvent(new Event('resize'));
+      this._map.leafletElement.invalidateSize(this.props.interactive);
     }
   },
 
