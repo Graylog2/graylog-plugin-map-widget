@@ -44,6 +44,8 @@ const MapVisualization = React.createClass({
   },
 
   _map: undefined,
+  _isMapReady: false,
+  _areTilesReady: false,
   position: [0, 0],
   MARKER_RADIUS_SIZES: 10,
   MARKER_RADIUS_INCREMENT_SIZES: 10,
@@ -86,8 +88,24 @@ const MapVisualization = React.createClass({
     return bucket + increment;
   },
 
+  _handleRenderComplete() {
+    if (this._areTilesReady && this._isMapReady) {
+      this.props.onRenderComplete();
+    }
+  },
+
+  _handleMapReady() {
+    this._isMapReady = true;
+    this._handleRenderComplete();
+  },
+
+  _handleTilesReady() {
+    this._areTilesReady = true;
+    this._handleRenderComplete();
+  },
+
   render() {
-    const { data, id, height, width, url, attribution, interactive, onRenderComplete } = this.props;
+    const { data, id, height, width, url, attribution, interactive } = this.props;
 
     const terms = data.terms;
     const occurrences = Object.keys(terms).map(k => terms[k]);
@@ -108,8 +126,11 @@ const MapVisualization = React.createClass({
            style={{ height: height, width: width }}
            scrollWheelZoom={false}
            animate={interactive}
-           whenReady={onRenderComplete}>
-        <TileLayer url={url} maxZoom={19} attribution={attribution} />
+           zoomAnimation={interactive}
+           fadeAnimation={interactive}
+           markerZoomAnimation={interactive}
+           whenReady={this._handleMapReady}>
+        <TileLayer url={url} maxZoom={19} attribution={attribution} onLoad={this._handleTilesReady} />
         {markers}
       </Map>
     );
