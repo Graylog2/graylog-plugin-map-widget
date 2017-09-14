@@ -5,6 +5,7 @@
 @media print {
     :local(.map) {
         margin: 0 auto;
+        page-break-inside: avoid;
     }
 
     /* Hide zoom controls */
