@@ -16,6 +16,7 @@ const MapVisualization = React.createClass({
     attribution: PropTypes.string,
     interactive: PropTypes.bool,
     onRenderComplete: PropTypes.func,
+    locked: PropTypes.bool, // Disables zoom and dragging
   },
   getDefaultProps() {
     return {
@@ -24,6 +25,7 @@ const MapVisualization = React.createClass({
       attribution: '&copy; <a href="http://osm.org/copyright" target="_blank">OpenStreetMap</a> contributors',
       interactive: true,
       onRenderComplete: () => {},
+      locked: PropTypes.bool,
     };
   },
 
@@ -101,7 +103,7 @@ const MapVisualization = React.createClass({
   },
 
   render() {
-    const { data, id, height, width, url, attribution, interactive } = this.props;
+    const { data, id, height, width, url, attribution, interactive, locked } = this.props;
 
     const terms = data.terms;
     const occurrences = Object.keys(terms).map(k => terms[k]);
@@ -113,22 +115,25 @@ const MapVisualization = React.createClass({
     const markers = coordinates.map(aCoordinates => this._formatMarker(aCoordinates, terms[aCoordinates], minOccurrences, maxOccurrences, increment));
 
     return (
-      <Map ref={(c) => { this._map = c; }}
-           id={`visualization-${id}`}
-           center={this.position}
-           zoom={this.state.zoomLevel}
-           onZoomend={this._onZoomChange}
-           className={style.map}
-           style={{ height: height, width: width }}
-           scrollWheelZoom={false}
-           animate={interactive}
-           zoomAnimation={interactive}
-           fadeAnimation={interactive}
-           markerZoomAnimation={interactive}
-           whenReady={this._handleMapReady}>
-        <TileLayer url={url} maxZoom={19} attribution={attribution} onLoad={this._handleTilesReady} />
-        {markers}
-      </Map>
+      <div className={locked ? style.mapLocked : ''}>
+        {locked && <div className={style.overlay} style={{ height: height, width: width }} />}
+        <Map ref={(c) => { this._map = c; }}
+             id={`visualization-${id}`}
+             center={this.position}
+             zoom={this.state.zoomLevel}
+             onZoomend={this._onZoomChange}
+             className={style.map}
+             style={{ height: height, width: width }}
+             scrollWheelZoom={false}
+             animate={interactive}
+             zoomAnimation={interactive}
+             fadeAnimation={interactive}
+             markerZoomAnimation={interactive}
+             whenReady={this._handleMapReady}>
+          <TileLayer url={url} maxZoom={19} attribution={attribution} onLoad={this._handleTilesReady} />
+          {markers}
+        </Map>
+      </div>
     );
   },
 });
