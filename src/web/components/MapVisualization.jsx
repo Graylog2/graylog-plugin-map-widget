@@ -61,8 +61,13 @@ const MapVisualization = React.createClass({
     const formattedCoordinates = coordinates.split(',').map(component => Number(component));
     const radius = this._getBucket(occurrences, this.MARKER_RADIUS_SIZES, min, max, increment);
     return (
-      <CircleMarker key={coordinates} center={formattedCoordinates} radius={radius} color="#AF2228" fillColor="#D3242B"
-                    weight={2} opacity={0.8}>
+      <CircleMarker key={coordinates}
+                    center={formattedCoordinates}
+                    radius={radius}
+                    color="#AF2228"
+                    fillColor="#D3242B"
+                    weight={2}
+                    opacity={0.8}>
         <Popup>
           <dl>
             <dt>Coordinates:</dt>
