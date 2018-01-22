@@ -168,7 +168,12 @@ public class MaxmindDataAdapter extends LookupDataAdapter {
                     map.put("subdivisions", city.getSubdivisions());
                     map.put("traits", city.getTraits());
 
-                    final String singleValue = location == null ? null : location.getLatitude() + "," + location.getLongitude();
+                    final String singleValue;
+                    if (location == null || location.getLatitude() == null || location.getLongitude() == null) {
+                        singleValue = null;
+                    } else {
+                        singleValue = location.getLatitude() + "," + location.getLongitude();
+                    }
                     return LookupResult.multi(singleValue, map);
                 } catch (AddressNotFoundException nfe) {
                     LOG.debug("Unable to look up city data for IP address {}, returning empty result.", addr, nfe);
