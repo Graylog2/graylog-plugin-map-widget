@@ -3,6 +3,9 @@ package org.graylog.plugins.map.geoip;
 import com.codahale.metrics.MetricRegistry;
 import com.google.common.collect.ImmutableMap;
 import com.maxmind.geoip2.DatabaseReader;
+import com.maxmind.geoip2.model.CityResponse;
+import com.maxmind.geoip2.model.CountryResponse;
+import com.maxmind.geoip2.record.City;
 import org.graylog.plugins.map.config.DatabaseType;
 import org.graylog2.plugin.lookup.LookupResult;
 import org.junit.After;
@@ -75,9 +78,8 @@ public class MaxmindDataAdapterTest {
         }
 
         @Test
-        public void doGetReturnsEmptyResultIfDatabaseReaderReturnsNull() throws Exception {
+        public void doGetReturnsEmptyResultIfDatabaseReaderReturnsNull() {
             final DatabaseReader mockDatabaseReader = mock(DatabaseReader.class);
-            when(mockDatabaseReader.city(any())).thenReturn(null);
             final DatabaseReader oldDatabaseReader = adapter.getDatabaseReader();
 
             try {
@@ -116,6 +118,24 @@ public class MaxmindDataAdapterTest {
                     .extracting("metroCode")
                     .containsExactly(807);
         }
+
+        @Test
+        public void doGetReturnsResultIfCityResponseFieldsAreNull() throws Exception {
+            final CityResponse cityResponse = new CityResponse(null, null, null, null, null, null, null, null, null, null);
+            final DatabaseReader mockDatabaseReader = mock(DatabaseReader.class);
+            when(mockDatabaseReader.city(any())).thenReturn(cityResponse);
+            final DatabaseReader oldDatabaseReader = adapter.getDatabaseReader();
+
+            try {
+                adapter.setDatabaseReader(mockDatabaseReader);
+
+                final LookupResult lookupResult = adapter.doGet("127.0.0.1");
+                assertThat(lookupResult.isEmpty()).isFalse();
+                assertThat(lookupResult.singleValue()).isNull();
+            } finally {
+                adapter.setDatabaseReader(oldDatabaseReader);
+            }
+        }
     }
 
     public static class CountryDatabaseTest extends Base {
@@ -132,6 +152,24 @@ public class MaxmindDataAdapterTest {
                     .extracting("country")
                     .extracting("geoNameId")
                     .containsExactly(6252001);
+        }
+
+        @Test
+        public void doGetReturnsResultIfCountryResponseFieldsAreNull() throws Exception {
+            final CountryResponse countryResponse = new CountryResponse(null, null, null, null, null, null);
+            final DatabaseReader mockDatabaseReader = mock(DatabaseReader.class);
+            when(mockDatabaseReader.country(any())).thenReturn(countryResponse);
+            final DatabaseReader oldDatabaseReader = adapter.getDatabaseReader();
+
+            try {
+                adapter.setDatabaseReader(mockDatabaseReader);
+
+                final LookupResult lookupResult = adapter.doGet("127.0.0.1");
+                assertThat(lookupResult.isEmpty()).isFalse();
+                assertThat(lookupResult.singleValue()).isNull();
+            } finally {
+                adapter.setDatabaseReader(oldDatabaseReader);
+            }
         }
     }
 }

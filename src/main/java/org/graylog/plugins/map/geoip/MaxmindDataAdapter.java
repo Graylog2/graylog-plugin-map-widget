@@ -8,7 +8,6 @@ import com.fasterxml.jackson.databind.annotation.JsonDeserialize;
 import com.google.auto.value.AutoValue;
 import com.google.common.annotations.VisibleForTesting;
 import com.google.common.collect.ArrayListMultimap;
-import com.google.common.collect.ImmutableMap;
 import com.google.common.collect.Multimap;
 import com.google.common.net.InetAddresses;
 import com.google.inject.assistedinject.Assisted;
@@ -16,6 +15,7 @@ import com.maxmind.geoip2.DatabaseReader;
 import com.maxmind.geoip2.exception.AddressNotFoundException;
 import com.maxmind.geoip2.model.CityResponse;
 import com.maxmind.geoip2.model.CountryResponse;
+import com.maxmind.geoip2.record.Country;
 import com.maxmind.geoip2.record.Location;
 import org.graylog.autovalue.WithBeanGetter;
 import org.graylog.plugins.map.config.DatabaseType;
@@ -38,6 +38,8 @@ import java.net.InetAddress;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.Paths;
+import java.util.HashMap;
+import java.util.Map;
 import java.util.Optional;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicReference;
@@ -155,9 +157,7 @@ public class MaxmindDataAdapter extends LookupDataAdapter {
                     }
 
                     final Location location = city.getLocation();
-                    final String singleValue = location.getLatitude() + "," + location.getLongitude();
-
-                    final ImmutableMap.Builder<Object, Object> map = ImmutableMap.builder();
+                    final Map<Object, Object> map = new HashMap<>();
                     map.put("city", city.getCity());
                     map.put("continent", city.getContinent());
                     map.put("country", city.getCountry());
@@ -168,7 +168,8 @@ public class MaxmindDataAdapter extends LookupDataAdapter {
                     map.put("subdivisions", city.getSubdivisions());
                     map.put("traits", city.getTraits());
 
-                    return LookupResult.multi(singleValue, map.build());
+                    final String singleValue = location == null ? null : location.getLatitude() + "," + location.getLongitude();
+                    return LookupResult.multi(singleValue, map);
                 } catch (AddressNotFoundException nfe) {
                     LOG.debug("Unable to look up city data for IP address {}, returning empty result.", addr, nfe);
                     return LookupResult.empty();
@@ -178,21 +179,22 @@ public class MaxmindDataAdapter extends LookupDataAdapter {
                 }
             case MAXMIND_COUNTRY:
                 try {
-                    final CountryResponse country = reader.country(addr);
-                    if (country == null) {
+                    final CountryResponse countryResponse = reader.country(addr);
+                    if (countryResponse == null) {
                         LOG.debug("No country data for IP address {}, returning empty result.", addr);
                         return LookupResult.empty();
                     }
 
-                    final ImmutableMap.Builder<Object, Object> map = ImmutableMap.builder();
-                    map.put("continent", country.getContinent());
-                    map.put("country", country.getCountry());
-                    map.put("registered_country", country.getRegisteredCountry());
-                    map.put("represented_country", country.getRepresentedCountry());
-                    map.put("traits", country.getTraits());
+                    final Country country = countryResponse.getCountry();
+                    final Map<Object, Object> map = new HashMap<>();
+                    map.put("continent", countryResponse.getContinent());
+                    map.put("country", country);
+                    map.put("registered_country", countryResponse.getRegisteredCountry());
+                    map.put("represented_country", countryResponse.getRepresentedCountry());
+                    map.put("traits", countryResponse.getTraits());
 
-                    final String singleValue = country.getCountry().getIsoCode();
-                    return LookupResult.multi(singleValue, map.build());
+                    final String singleValue = country == null ? null : country.getIsoCode();
+                    return LookupResult.multi(singleValue, map);
                 } catch (AddressNotFoundException nfe) {
                     LOG.debug("Unable to look up country data for IP address {}, returning empty result.", addr, nfe);
                     return LookupResult.empty();
