@@ -58,3 +58,8 @@ $ mvn release:perform
 ```
 
 This sets the version numbers, creates a tag and pushes to GitHub. Travis CI will build the release artifacts and upload to GitHub automatically.
+
+Attribution
+-----------
+
+This product includes GeoLite2 data created by MaxMind, available from [http://www.maxmind.com](http://www.maxmind.com), under the license [CC BY-SA 4.0](https://creativecommons.org/licenses/by-sa/4.0/).
