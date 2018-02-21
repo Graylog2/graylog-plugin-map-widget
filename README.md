@@ -1,3 +1,11 @@
+# DEPRECATION NOTICE
+
+This project has been merged into [graylog2-server](https://github.com/Graylog2/graylog2-server), see [#57](https://github.com/Graylog2/graylog-plugin-map-widget/issues/57)
+
+Please use the [issue tracker in the graylog2-server repository](https://github.com/Graylog2/graylog2-server/issues) for any feature requests or bug reports.
+
+----
+
 # Map Widget Plugin for Graylog
 
 [![Build Status](https://travis-ci.org/Graylog2/graylog-plugin-map-widget.svg)](https://travis-ci.org/Graylog2/graylog-plugin-map-widget)
